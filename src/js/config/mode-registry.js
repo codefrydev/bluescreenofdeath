@@ -56,7 +56,8 @@ export const MODES = [
     { id: 'circular_maze', label: 'Infinite Circular Maze - Neural Engine', categoryId: 'games', renderType: 'iframe' },
     { id: 'maze', label: 'Infinite Maze - High Performance Engine', categoryId: 'games', renderType: 'iframe' },
     { id: 'neon_ecosystem', label: '3D Neon Ecosystem - Fixed', categoryId: 'games', renderType: 'iframe' },
-    { id: 'koi_pond', label: 'Procedural Koi Pond', categoryId: 'games', renderType: 'iframe' }
+    { id: 'koi_pond', label: 'Procedural Koi Pond', categoryId: 'games', renderType: 'iframe' },
+    { id: 'game_2048', label: '2048', categoryId: 'games', renderType: 'iframe' }
 ];
 
 const modeById = new Map(MODES.map(m => [m.id, m]));

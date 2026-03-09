@@ -135,6 +135,8 @@ export async function initGamesMode(mode, canvas) {
         await loadAndInjectNeonEcosystem();
     } else if (mode === 'koi_pond') {
         await loadAndInjectKoiPond();
+    } else if (mode === 'game_2048') {
+        await loadAndInjectGame2048();
     }
 
     // Show the game container
@@ -610,6 +612,40 @@ async function loadAndInjectKoiPond() {
     } catch (error) {
         console.warn('Failed to load Koi Pond template, using direct path:', error);
         gameIframe.src = 'src/templates/games/koi_pond.html';
+    }
+
+    gameContainer.appendChild(gameIframe);
+}
+
+/**
+ * Load and inject 2048 game
+ */
+async function loadAndInjectGame2048() {
+    if (gameIframe) {
+        gameIframe.remove();
+        gameIframe = null;
+    }
+
+    gameIframe = document.createElement('iframe');
+    gameIframe.id = 'game-2048-iframe';
+    gameIframe.style.cssText = `
+        width: 100%;
+        height: 100%;
+        border: none;
+        background: #faf8ef;
+    `;
+    gameIframe.sandbox = 'allow-scripts allow-same-origin allow-forms';
+
+    try {
+        const template = await loadTemplate('game_2048');
+        if (template && template.html) {
+            gameIframe.srcdoc = template.html;
+        } else {
+            gameIframe.src = 'src/templates/games/game_2048.html';
+        }
+    } catch (error) {
+        console.warn('Failed to load 2048 template, using direct path:', error);
+        gameIframe.src = 'src/templates/games/game_2048.html';
     }
 
     gameContainer.appendChild(gameIframe);

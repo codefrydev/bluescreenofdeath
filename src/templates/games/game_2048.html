@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2048</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pop {
+            0% { transform: scale(0.8); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop {
+            animation: pop 0.2s ease-in-out;
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        /* Prevent pull-to-refresh and scrolling on the game board on mobile */
+        #game-board {
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-[#faf8ef] flex flex-col items-center justify-center p-4 font-sans text-[#776e65]">
+
+    <div class="w-full max-w-[500px]">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-5xl md:text-7xl font-bold">2048</h1>
+            <div class="flex space-x-2">
+                <div class="bg-[#bbada0] px-4 py-2 rounded-md flex flex-col items-center justify-center min-w-[70px]">
+                    <span class="text-[#eee4da] text-xs font-bold uppercase tracking-wider">Score</span>
+                    <span id="score" class="text-white font-bold text-xl">0</span>
+                </div>
+                <div class="bg-[#bbada0] px-4 py-2 rounded-md flex flex-col items-center justify-center min-w-[70px]">
+                    <span class="text-[#eee4da] text-xs font-bold uppercase tracking-wider">Best</span>
+                    <span id="best-score" class="text-white font-bold text-xl">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls & Intro -->
+        <div class="flex justify-between items-end mb-8">
+            <p class="text-lg leading-tight w-1/2 md:w-2/3 pr-4">
+                Join the numbers and get to the <strong>2048 tile!</strong>
+            </p>
+            <div class="flex flex-col space-y-2 shrink-0">
+                <button id="new-game-btn" class="bg-[#8f7a66] hover:bg-[#9f8b77] text-white font-bold py-2 px-6 rounded-md transition-colors w-full shadow-sm">
+                    New Game
+                </button>
+                <button id="auto-play-btn" class="bg-[#edc22e] hover:bg-[#edc53f] text-white font-bold py-2 px-6 rounded-md transition-colors w-full shadow-sm">
+                    🤖 Auto Play
+                </button>
+            </div>
+        </div>
+
+        <!-- Game Board Container -->
+        <div id="game-board" class="relative bg-[#bbada0] p-3 md:p-4 rounded-xl w-full aspect-square select-none">
+            <!-- Grid Background (Empty Slots) -->
+            <div class="grid grid-cols-4 grid-rows-4 gap-3 md:gap-4 w-full h-full absolute inset-0 p-3 md:p-4 z-0">
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+                <div class="bg-[#cdc1b4] rounded-md w-full h-full"></div>
+            </div>
+
+            <!-- Dynamic Tiles Container -->
+            <div id="tiles-container" class="grid grid-cols-4 grid-rows-4 gap-3 md:gap-4 w-full h-full relative z-10">
+                <!-- Tiles injected via JS -->
+            </div>
+
+            <!-- Game Over Overlay -->
+            <div id="game-over-overlay" class="hidden absolute inset-0 bg-[#eee4da]/70 z-20 flex flex-col items-center justify-center rounded-xl animate-fade-in">
+                <h2 class="text-5xl md:text-6xl font-bold text-[#776e65] mb-6">Game Over!</h2>
+                <button id="try-again-btn" class="bg-[#8f7a66] hover:bg-[#9f8b77] text-white font-bold py-3 px-8 rounded-md text-xl transition-colors">
+                    Try Again
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer / Instructions -->
+        <div class="mt-8 text-[#776e65] text-sm md:text-base border-t border-[#d8d4d0] pt-6">
+            <p class="mb-4">
+                <strong class="font-bold uppercase text-[#776e65]">How to play:</strong> Use your <strong>arrow keys</strong> or <strong>swipe</strong> to move the tiles. Tiles with the same number merge into one when they touch. Keep playing to reach the highest number possible!
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // --- Constants & Variables ---
+        const GRID_SIZE = 4;
+        let board = [];
+        let animations = [];
+        let score = 0;
+        let bestScore = localStorage.getItem('2048-bestScore') ? parseInt(localStorage.getItem('2048-bestScore')) : 0;
+        let gameOver = false;
+        let isAutoPlaying = false;
+        let autoPlayInterval = null;
+
+        const DOM = {
+            score: document.getElementById('score'),
+            bestScore: document.getElementById('best-score'),
+            tilesContainer: document.getElementById('tiles-container'),
+            gameOverOverlay: document.getElementById('game-over-overlay'),
+            newGameBtn: document.getElementById('new-game-btn'),
+            tryAgainBtn: document.getElementById('try-again-btn'),
+            autoPlayBtn: document.getElementById('auto-play-btn'),
+            gameBoard: document.getElementById('game-board')
+        };
+
+        const TILE_COLORS = {
+            2: { bg: '#eee4da', text: '#776e65', size: 'text-4xl md:text-5xl' },
+            4: { bg: '#ede0c8', text: '#776e65', size: 'text-4xl md:text-5xl' },
+            8: { bg: '#f2b179', text: '#f9f6f2', size: 'text-4xl md:text-5xl' },
+            16: { bg: '#f59563', text: '#f9f6f2', size: 'text-4xl md:text-5xl' },
+            32: { bg: '#f67c5f', text: '#f9f6f2', size: 'text-4xl md:text-5xl' },
+            64: { bg: '#f65e3b', text: '#f9f6f2', size: 'text-4xl md:text-5xl' },
+            128: { bg: '#edcf72', text: '#f9f6f2', size: 'text-3xl md:text-4xl' },
+            256: { bg: '#edcc61', text: '#f9f6f2', size: 'text-3xl md:text-4xl' },
+            512: { bg: '#edc850', text: '#f9f6f2', size: 'text-3xl md:text-4xl' },
+            1024: { bg: '#edc53f', text: '#f9f6f2', size: 'text-2xl md:text-3xl' },
+            2048: { bg: '#edc22e', text: '#f9f6f2', size: 'text-2xl md:text-3xl' }
+        };
+
+        // --- Core Functions ---
+        const getTileStyle = (value) => {
+            if (value === 0) return { bg: 'transparent', text: 'transparent', size: '' };
+            if (TILE_COLORS[value]) return TILE_COLORS[value];
+
+            // Dynamic styling for values > 2048
+            const power = Math.log2(value);
+            const hue = (power * 45) % 360;
+
+            let size = 'text-2xl md:text-3xl';
+            if (value >= 16384) size = 'text-xl md:text-2xl'; // 5 digits
+            if (value >= 131072) size = 'text-lg md:text-xl'; // 6 digits
+            if (value >= 1048576) size = 'text-base md:text-lg'; // 7 digits
+
+            return { bg: `hsl(${hue}, 65%, 50%)`, text: '#f9f6f2', size: size };
+        };
+
+        const getEmptyCells = (currentBoard) => {
+            const emptyCells = [];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (currentBoard[r][c] === 0) emptyCells.push({ r, c });
+                }
+            }
+            return emptyCells;
+        };
+
+        const cloneBoard = (b) => b.map((row) => [...row]);
+
+        const addRandomTile = (currentBoard) => {
+            const emptyCells = getEmptyCells(currentBoard);
+            if (emptyCells.length === 0) return currentBoard;
+
+            const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+            const newBoard = cloneBoard(currentBoard);
+            newBoard[randomCell.r][randomCell.c] = Math.random() < 0.9 ? 2 : 4;
+
+            // Mark for animation
+            animations[randomCell.r][randomCell.c] = true;
+            return newBoard;
+        };
+
+        const checkGameOver = (currentBoard) => {
+            if (getEmptyCells(currentBoard).length > 0) return false;
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const current = currentBoard[r][c];
+                    if ((r < GRID_SIZE - 1 && currentBoard[r + 1][c] === current) ||
+                        (c < GRID_SIZE - 1 && currentBoard[r][c + 1] === current)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        };
+
+        // --- Rendering ---
+        const updateDOM = () => {
+            DOM.score.innerText = score;
+            DOM.bestScore.innerText = bestScore;
+
+            let html = '';
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const val = board[r][c];
+                    const style = getTileStyle(val);
+                    const isAnimating = animations[r][c];
+                    const classes = `flex items-center justify-center rounded-md font-bold transition-all duration-100 ease-in-out ${val > 0 ? 'shadow-sm' : ''} ${isAnimating ? 'animate-pop' : ''} ${style.size}`;
+
+                    html += `<div class="${classes}" style="background-color: ${style.bg}; color: ${style.text};">${val !== 0 ? val : ''}</div>`;
+                }
+            }
+            DOM.tilesContainer.innerHTML = html;
+
+            if (gameOver) {
+                DOM.gameOverOverlay.classList.remove('hidden');
+                stopAutoPlay();
+            } else {
+                DOM.gameOverOverlay.classList.add('hidden');
+            }
+
+            // Clear animations state for next render
+            setTimeout(() => {
+                animations = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(false));
+                // Remove animation classes from DOM elements to allow re-triggering later
+                const tiles = DOM.tilesContainer.children;
+                for (let i = 0; i < tiles.length; i++) {
+                    tiles[i].classList.remove('animate-pop');
+                }
+            }, 200);
+        };
+
+        const initGame = () => {
+            board = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
+            animations = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(false));
+            board = addRandomTile(board);
+            board = addRandomTile(board);
+            score = 0;
+            gameOver = false;
+            stopAutoPlay();
+            updateDOM();
+        };
+
+        // --- Movement Logic ---
+        const move = (direction) => {
+            if (gameOver) return;
+
+            let currentBoard = cloneBoard(board);
+            let currentScore = score;
+            let moved = false;
+            animations = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(false));
+
+            const slide = (row) => {
+                let arr = row.filter(val => val);
+                let missing = GRID_SIZE - arr.length;
+                let zeros = Array(missing).fill(0);
+                return arr.concat(zeros);
+            };
+
+            const combine = (row, rowIndex, isVertical = false, isReversed = false) => {
+                for (let i = 0; i < GRID_SIZE - 1; i++) {
+                    if (row[i] !== 0 && row[i] === row[i + 1]) {
+                        row[i] *= 2;
+                        currentScore += row[i];
+                        row[i + 1] = 0;
+
+                        let actualR = isVertical ? i : rowIndex;
+                        let actualC = isVertical ? rowIndex : i;
+                        if (isReversed) {
+                            actualR = isVertical ? (GRID_SIZE - 1 - i) : rowIndex;
+                            actualC = isVertical ? rowIndex : (GRID_SIZE - 1 - i);
+                        }
+                        animations[actualR][actualC] = true;
+                    }
+                }
+                return row;
+            };
+
+            const operate = (row, rowIndex, isVertical = false, isReversed = false) => {
+                row = slide(row);
+                row = combine(row, rowIndex, isVertical, isReversed);
+                row = slide(row);
+                return row;
+            };
+
+            const transpose = (matrix) => matrix[0].map((_, colIndex) => matrix.map(row => row[colIndex]));
+
+            if (direction === 'LEFT') {
+                for (let i = 0; i < GRID_SIZE; i++) {
+                    let originalRow = [...currentBoard[i]];
+                    currentBoard[i] = operate(currentBoard[i], i);
+                    if (originalRow.join(',') !== currentBoard[i].join(',')) moved = true;
+                }
+            } else if (direction === 'RIGHT') {
+                for (let i = 0; i < GRID_SIZE; i++) {
+                    let originalRow = [...currentBoard[i]];
+                    let reversedRow = [...currentBoard[i]].reverse();
+                    reversedRow = operate(reversedRow, i, false, true);
+                    currentBoard[i] = reversedRow.reverse();
+                    if (originalRow.join(',') !== currentBoard[i].join(',')) moved = true;
+                }
+            } else if (direction === 'UP') {
+                let transposed = transpose(currentBoard);
+                for (let i = 0; i < GRID_SIZE; i++) {
+                    let originalRow = [...transposed[i]];
+                    transposed[i] = operate(transposed[i], i, true);
+                    if (originalRow.join(',') !== transposed[i].join(',')) moved = true;
+                }
+                currentBoard = transpose(transposed);
+            } else if (direction === 'DOWN') {
+                let transposed = transpose(currentBoard);
+                for (let i = 0; i < GRID_SIZE; i++) {
+                    let originalRow = [...transposed[i]];
+                    let reversedRow = [...transposed[i]].reverse();
+                    reversedRow = operate(reversedRow, i, true, true);
+                    transposed[i] = reversedRow.reverse();
+                    if (originalRow.join(',') !== transposed[i].join(',')) moved = true;
+                }
+                currentBoard = transpose(transposed);
+            }
+
+            if (moved) {
+                currentBoard = addRandomTile(currentBoard);
+                board = currentBoard;
+                score = currentScore;
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    localStorage.setItem('2048-bestScore', bestScore);
+                }
+
+                if (checkGameOver(board)) {
+                    gameOver = true;
+                }
+
+                updateDOM();
+            }
+        };
+
+        // --- AI Auto Play Logic ---
+        const AI_WEIGHTS = [
+            [65536, 32768, 16384, 8192],
+            [512,  1024,  2048,  4096],
+            [256,  128,   64,    32],
+            [1,    2,     4,     8]
+        ];
+
+        const evaluateBoard = (b) => {
+            let s = 0;
+            let empty = 0;
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (b[r][c] === 0) empty++;
+                    else s += b[r][c] * AI_WEIGHTS[r][c];
+                }
+            }
+            return s + (empty * 100000);
+        };
+
+        const simulateMove = (b, direction) => {
+            let newBoard = cloneBoard(b);
+            let moved = false;
+            const slide = (row) => row.filter(v => v).concat(Array(GRID_SIZE - row.filter(v => v).length).fill(0));
+            const combine = (row) => {
+                let newRow = [...row];
+                for (let i = 0; i < GRID_SIZE - 1; i++) {
+                    if (newRow[i] !== 0 && newRow[i] === newRow[i + 1]) {
+                        newRow[i] *= 2;
+                        newRow[i + 1] = 0;
+                    }
+                }
+                return newRow;
+            };
+            const operate = (row) => slide(combine(slide([...row])));
+            const operateReverse = (row) => slide(combine(slide([...row].reverse()))).reverse();
+            const transpose = (matrix) => matrix[0].map((_, colIndex) => matrix.map(r => r[colIndex]));
+
+            if (direction === 'LEFT') {
+                for (let i = 0; i < GRID_SIZE; i++) {
+                    let orig = newBoard[i].join(',');
+                    newBoard[i] = operate(newBoard[i]);
+                    if (orig !== newBoard[i].join(',')) moved = true;
+                }
+            } else if (direction === 'RIGHT') {
+                for (let i = 0; i < GRID_SIZE; i++) {
+                    let orig = newBoard[i].join(',');
+                    newBoard[i] = operateReverse(newBoard[i]);
+                    if (orig !== newBoard[i].join(',')) moved = true;
+                }
+            } else if (direction === 'UP') {
+                let transposed = transpose(newBoard);
+                for (let i = 0; i < GRID_SIZE; i++) {
+                    let orig = transposed[i].join(',');
+                    transposed[i] = operate(transposed[i]);
+                    if (orig !== transposed[i].join(',')) moved = true;
+                }
+                newBoard = transpose(transposed);
+            } else if (direction === 'DOWN') {
+                let transposed = transpose(newBoard);
+                for (let i = 0; i < GRID_SIZE; i++) {
+                    let orig = transposed[i].join(',');
+                    transposed[i] = operateReverse(transposed[i]);
+                    if (orig !== transposed[i].join(',')) moved = true;
+                }
+                newBoard = transpose(transposed);
+            }
+            return { newBoard, moved };
+        };
+
+        const expectiMax = (b, depth, isPlayerTurn) => {
+            if (depth === 0) return evaluateBoard(b);
+
+            if (isPlayerTurn) {
+                let maxScore = -Infinity;
+                let hasMoves = false;
+                for (let dir of ['UP', 'RIGHT', 'DOWN', 'LEFT']) {
+                    const { newBoard, moved } = simulateMove(b, dir);
+                    if (moved) {
+                        hasMoves = true;
+                        maxScore = Math.max(maxScore, expectiMax(newBoard, depth - 1, false));
+                    }
+                }
+                return hasMoves ? maxScore : evaluateBoard(b);
+            } else {
+                let emptyCells = getEmptyCells(b);
+                if (emptyCells.length === 0) return evaluateBoard(b);
+
+                let totalScore = 0;
+                let sampleCells = emptyCells.length > 6 ? emptyCells.sort(() => 0.5 - Math.random()).slice(0, 6) : emptyCells;
+
+                for (let cell of sampleCells) {
+                    let b2 = cloneBoard(b); b2[cell.r][cell.c] = 2;
+                    totalScore += 0.9 * expectiMax(b2, depth - 1, true);
+                    let b4 = cloneBoard(b); b4[cell.r][cell.c] = 4;
+                    totalScore += 0.1 * expectiMax(b4, depth - 1, true);
+                }
+                return totalScore / sampleCells.length;
+            }
+        };
+
+        const getBestMove = (b) => {
+            let bestScore = -Infinity;
+            let bestDir = null;
+            const dirs = ['UP', 'RIGHT', 'DOWN', 'LEFT'];
+
+            for (let dir of dirs) {
+                const { newBoard, moved } = simulateMove(b, dir);
+                if (moved) {
+                    let score = expectiMax(newBoard, 2, false); // Depth 2 for performance in JS
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestDir = dir;
+                    }
+                }
+            }
+            if (!bestDir) {
+                for (let dir of dirs) {
+                    if (simulateMove(b, dir).moved) return dir;
+                }
+            }
+            return bestDir;
+        };
+
+        const toggleAutoPlay = () => {
+            isAutoPlaying = !isAutoPlaying;
+            if (isAutoPlaying) {
+                DOM.autoPlayBtn.innerHTML = 'Stop Auto';
+                DOM.autoPlayBtn.classList.replace('bg-[#edc22e]', 'bg-[#f67c5f]');
+                DOM.autoPlayBtn.classList.replace('hover:bg-[#edc53f]', 'hover:bg-[#f65e3b]');
+
+                autoPlayInterval = setInterval(() => {
+                    if (gameOver) {
+                        stopAutoPlay();
+                        return;
+                    }
+                    const bestDir = getBestMove(board);
+                    if (bestDir) move(bestDir);
+                    else stopAutoPlay();
+                }, 150);
+            } else {
+                stopAutoPlay();
+            }
+        };
+
+        const stopAutoPlay = () => {
+            isAutoPlaying = false;
+            clearInterval(autoPlayInterval);
+            DOM.autoPlayBtn.innerHTML = '🤖 Auto Play';
+            DOM.autoPlayBtn.classList.replace('bg-[#f67c5f]', 'bg-[#edc22e]');
+            DOM.autoPlayBtn.classList.replace('hover:bg-[#f65e3b]', 'hover:bg-[#edc53f]');
+        };
+
+        // --- Event Listeners ---
+        DOM.newGameBtn.addEventListener('click', initGame);
+        DOM.tryAgainBtn.addEventListener('click', initGame);
+        DOM.autoPlayBtn.addEventListener('click', toggleAutoPlay);
+
+        window.addEventListener('keydown', (e) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                e.preventDefault(); // Prevent page scrolling
+                if (isAutoPlaying) stopAutoPlay(); // Stop bot if user manually plays
+            }
+            switch (e.key) {
+                case 'ArrowUp': move('UP'); break;
+                case 'ArrowDown': move('DOWN'); break;
+                case 'ArrowLeft': move('LEFT'); break;
+                case 'ArrowRight': move('RIGHT'); break;
+            }
+        });
+
+        // Touch handling for mobile
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        DOM.gameBoard.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].clientX;
+            touchStartY = e.changedTouches[0].clientY;
+        }, { passive: false });
+
+        DOM.gameBoard.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // Prevent scrolling/pull-to-refresh while swiping on the board
+        }, { passive: false });
+
+        DOM.gameBoard.addEventListener('touchend', (e) => {
+            if (isAutoPlaying) stopAutoPlay();
+
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+
+            const dx = touchEndX - touchStartX;
+            const dy = touchEndY - touchStartY;
+
+            if (Math.max(Math.abs(dx), Math.abs(dy)) > 30) {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    move(dx > 0 ? 'RIGHT' : 'LEFT');
+                } else {
+                    move(dy > 0 ? 'DOWN' : 'UP');
+                }
+            }
+        });
+
+        // Start Game
+        DOM.bestScore.innerText = bestScore;
+        initGame();
+    </script>
+</body>
+</html>
