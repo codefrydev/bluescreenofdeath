@@ -30,6 +30,8 @@ window.isRandomScreensaverRunning = () => screensaverController.isRunning();
 window.searchPalette = searchPalette;
 window.modeCustomizer = modeCustomizer;
 window.screensaverController = screensaverController;
+window.store = store;
+window.engine = engine;
 
 // Initialize Core Engine
 engine.init();
