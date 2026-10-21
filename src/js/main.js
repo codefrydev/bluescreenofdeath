@@ -1,64 +1,41 @@
-// Main entry point - initializes the application
+// Main entry point - orchestrates engine, state, and UI components
 
-import { getCanvas, resizeCanvas } from './core/canvas.js';
-import { animate, setMode, initMode } from './core/animation.js';
-import { resetUITimer } from './ui/ui-timer.js';
-import { toggleMobileMenu, closeMobileMenu, handleMobileMenuItemClick, initMobileMenuHandlers } from './ui/mobile-menu.js';
-import { buildMenus } from './ui/menu-builder.js';
-import { initDropdowns } from './ui/dropdowns.js';
+import { engine } from './core/engine.js';
+import { store } from './core/store.js';
+import { navBar } from './ui/components/nav-bar.js';
+import { mobileDrawer } from './ui/components/mobile-drawer.js';
+import { searchPalette } from './ui/components/search-palette.js';
+import { modeCustomizer } from './ui/components/mode-customizer.js';
+import { screensaverController } from './ui/components/screensaver-modal.js';
+import { initHomeOverlay, showHomePage, showCanvasView } from './ui/home-overlay.js';
 import { initEventHandlers, toggleFullscreen } from './events/handlers.js';
-import { initHomeOverlay, showHomeOverlay, showHomePage, showCanvasView } from './ui/home-overlay.js';
-import { initGameScreensaver, toggleGameScreensaver } from './ui/game-screensaver.js';
-import { initRandomScreensaver, stopRandomScreensaver, isRandomScreensaverRunning } from './ui/random-screensaver.js';
 
-// Make functions available globally for HTML onclick handlers
-window.setMode = setMode;
-window.toggleMobileMenu = toggleMobileMenu;
-window.closeMobileMenu = closeMobileMenu;
-window.handleMobileMenuItemClick = handleMobileMenuItemClick;
-window.toggleFullscreen = toggleFullscreen;
-window.showHomeOverlay = showHomeOverlay;
+// Setup global helpers for HTML attributes and legacy callers
+window.setMode = async function (modeId, val, el) {
+  showCanvasView();
+  if (val) {
+    store.set('currentColor', val);
+  }
+  await engine.switchMode(modeId);
+};
+
 window.showHomePage = showHomePage;
 window.showCanvasView = showCanvasView;
-window.toggleGameScreensaver = toggleGameScreensaver;
-window.stopRandomScreensaver = stopRandomScreensaver;
-window.isRandomScreensaverRunning = isRandomScreensaverRunning;
+window.toggleFullscreen = toggleFullscreen;
+window.toggleMobileMenu = () => mobileDrawer.toggle();
+window.closeMobileMenu = () => mobileDrawer.close();
+window.toggleGameScreensaver = () => screensaverController.openModal();
+window.stopRandomScreensaver = () => screensaverController.stop();
+window.isRandomScreensaverRunning = () => screensaverController.isRunning();
 
-// Initialize canvas
-resizeCanvas();
+// Initialize Core Engine
+engine.init();
 
-// Initialize mode
-initMode();
-
-// Start animation loop
-animate();
-
-// Initialize UI timer
-resetUITimer();
-
-// Build desktop and mobile menus from registry, then init dropdown behavior
-buildMenus();
-initDropdowns();
-
-// Initialize event handlers
-initEventHandlers();
-
-// Initialize home overlay (shows on first visit)
+// Initialize UI Subsystems
+navBar.init();
+mobileDrawer.init();
+searchPalette.init();
+modeCustomizer.init();
+screensaverController.init();
 initHomeOverlay();
-
-// Initialize game screensaver
-initGameScreensaver();
-
-// Initialize random screensaver
-initRandomScreensaver();
-
-// Initialize mobile menu handlers (fixes double-click issue)
-// Wait for DOM to be ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(initMobileMenuHandlers, 100);
-    });
-} else {
-    setTimeout(initMobileMenuHandlers, 100);
-}
-
+initEventHandlers();

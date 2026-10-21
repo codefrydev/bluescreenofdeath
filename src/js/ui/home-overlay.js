@@ -1,256 +1,148 @@
-// Home page navigation functions
+// Home Page Navigation and Category Modal Component
 
-import { getBody } from '../core/canvas.js';
-import { getCategories, getModesForCategory } from '../config/mode-registry.js';
-import { resetUITimer } from './ui-timer.js';
-import { startRandomScreensaver } from './random-screensaver.js';
-
-const body = getBody();
-const STORAGE_KEY = 'bluescreen_home_shown';
+import { modeRegistry } from '../config/mode-registry.js';
+import { engine } from '../core/engine.js';
+import { screensaverController } from './components/screensaver-modal.js';
 
 export function showHomePage() {
-    const homePage = document.getElementById('homePage');
-    const canvas = document.getElementById('colorCanvas');
-    const uiContainer = document.getElementById('ui-container');
-    const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
-    
-    if (homePage) {
-        homePage.style.display = 'block';
-    }
-    
-    if (canvas) {
-        canvas.style.display = 'none';
-    }
-    
-    if (uiContainer) {
-        uiContainer.style.display = 'none';
-    }
-    
-    if (mobileMenuBtn) {
-        mobileMenuBtn.style.display = 'none';
-    }
-    
-    body.classList.add('home-view');
-    body.classList.remove('canvas-view');
-    body.style.overflow = 'auto';
+  const homePage = document.getElementById('homePage');
+  const canvas = document.getElementById('colorCanvas');
+  const uiContainer = document.getElementById('ui-container');
+  const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+
+  if (homePage) homePage.style.display = 'block';
+  if (canvas) canvas.style.display = 'none';
+  if (uiContainer) uiContainer.style.display = 'none';
+  if (mobileMenuBtn) mobileMenuBtn.style.display = 'none';
+
+  document.body.classList.add('home-view');
+  document.body.classList.remove('canvas-view');
+  document.body.style.overflow = 'auto';
 }
 
 export function showCanvasView() {
-    const homePage = document.getElementById('homePage');
-    const canvas = document.getElementById('colorCanvas');
-    const uiContainer = document.getElementById('ui-container');
-    const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
-    
-    if (homePage) {
-        homePage.style.display = 'none';
-    }
-    
-    if (canvas) {
-        canvas.style.display = 'block';
-        canvas.classList.remove('hidden');
-    }
-    
-    if (uiContainer) {
-        uiContainer.style.display = '';
-    }
-    
-    if (mobileMenuBtn) {
-        mobileMenuBtn.style.display = '';
-    }
-    
-    body.classList.remove('home-view');
-    body.classList.add('canvas-view');
-    body.style.overflow = 'hidden';
-    resetUITimer();
+  const homePage = document.getElementById('homePage');
+  const canvas = document.getElementById('colorCanvas');
+  const uiContainer = document.getElementById('ui-container');
+  const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+
+  if (homePage) homePage.style.display = 'none';
+  if (canvas) {
+    canvas.style.display = 'block';
+    canvas.classList.remove('hidden');
+  }
+  if (uiContainer) uiContainer.style.display = '';
+  if (mobileMenuBtn) mobileMenuBtn.style.display = '';
+
+  document.body.classList.remove('home-view');
+  document.body.classList.add('canvas-view');
+  document.body.style.overflow = 'hidden';
 }
 
-// Make showCanvasView available globally
+// Global exposure
+window.showHomePage = showHomePage;
 window.showCanvasView = showCanvasView;
+window.showHomeOverlay = showHomePage;
+window.hideHomeOverlay = showCanvasView;
 
-export function showHomeOverlay() {
-    // Legacy function for compatibility - now shows home page
-    showHomePage();
-}
+export function showCategoryModes(categoryId) {
+  const modes = modeRegistry.getModesByCategory(categoryId);
+  if (!modes || modes.length === 0) return;
 
-export function hideHomeOverlay() {
-    // Legacy function for compatibility - now shows canvas view
-    showCanvasView();
-}
+  const cat = modeRegistry.getCategory(categoryId);
+  const categoryLabel = cat ? cat.label : categoryId;
 
-function showCategoryModes(categoryId) {
-    const modesList = getModesForCategory(categoryId);
-    if (!modesList || modesList.length === 0) return;
-    const modes = modesList.map(m => ({ mode: m.id, name: m.label }));
-    const categories = getCategories();
-    const categoryLabel = (categories.find(c => c.id === categoryId) || {}).label || categoryId;
-    
-    // Remove any existing modal first
-    const existingModal = document.querySelector('.category-modal');
-    if (existingModal) {
-        existingModal.remove();
-    }
-    
-    const modal = document.createElement('div');
-    modal.className = 'category-modal';
+  // Remove existing modal
+  const existing = document.querySelector('.category-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.className = 'category-modal fixed inset-0 z-[3200] bg-black/75 backdrop-blur-md flex items-center justify-center p-4 transition-opacity duration-200';
+  modal.style.opacity = '0';
+
+  const modalContent = document.createElement('div');
+  modalContent.className = 'glass-dropdown border border-white/15 rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl max-h-[82vh] flex flex-col';
+
+  modalContent.innerHTML = `
+    <div class="flex items-center justify-between pb-3.5 border-b border-white/10 mb-4 flex-shrink-0">
+      <div class="flex items-center gap-2.5">
+        <span class="text-xl">${cat ? cat.icon : '✨'}</span>
+        <h3 class="text-lg font-bold text-white">${categoryLabel}</h3>
+      </div>
+      <button class="modal-close-btn w-8 h-8 rounded-lg bg-white/5 hover:bg-white/15 text-neutral-300 hover:text-white flex items-center justify-center text-lg leading-none cursor-pointer">×</button>
+    </div>
+    <div class="category-modes-grid grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto flex-1 pr-1">
+      ${modes.map(m => `
+        <button 
+          data-mode="${m.id}" 
+          class="cat-item-btn text-left p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-blue-600/20 hover:border-blue-500/40 text-xs text-neutral-200 hover:text-white transition-all cursor-pointer flex flex-col gap-1"
+        >
+          <span class="font-medium text-sm truncate">${m.label}</span>
+          <span class="text-[10px] text-neutral-400 truncate">${m.tags ? m.tags.slice(0, 2).join(', ') : ''}</span>
+        </button>
+      `).join('')}
+    </div>
+  `;
+
+  modal.appendChild(modalContent);
+  document.body.appendChild(modal);
+
+  const close = () => {
     modal.style.opacity = '0';
-    modal.style.transition = 'opacity 0.2s ease';
+    setTimeout(() => modal.remove(), 200);
+  };
 
-    const modalContent = document.createElement('div');
-    modalContent.className = 'category-modal-content';
-    modalContent.style.maxWidth = '28rem';
-    modalContent.style.width = '100%';
-    modalContent.style.maxHeight = '80vh';
+  modalContent.querySelector('.modal-close-btn').addEventListener('click', close);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) close();
+  });
 
-    const header = document.createElement('div');
-    header.className = 'flex items-center justify-between mb-4';
-
-    const title = document.createElement('h2');
-    title.className = 'text-lg font-semibold text-[var(--color-text)] m-0';
-    title.textContent = categoryLabel;
-
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'category-modal-close w-8 h-8 flex items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer text-xl leading-none hover:bg-[var(--color-hover)]';
-    closeBtn.innerHTML = '×';
-    closeBtn.setAttribute('aria-label', 'Close');
-
-    header.appendChild(title);
-    header.appendChild(closeBtn);
-    modalContent.appendChild(header);
-
-    const modesGrid = document.createElement('div');
-    modesGrid.className = 'category-modes-grid grid gap-2';
-    modesGrid.style.gridTemplateColumns = 'repeat(1, minmax(0, 1fr))';
-    
-    // Responsive grid - update on resize
-    const updateGrid = () => {
-        if (window.innerWidth >= 640) {
-            modesGrid.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
-        } else {
-            modesGrid.style.gridTemplateColumns = 'repeat(1, minmax(0, 1fr))';
-        }
-    };
-    
-    updateGrid();
-    window.addEventListener('resize', updateGrid);
-    
-    // Clean up resize listener when modal closes
-    const cleanup = () => {
-        window.removeEventListener('resize', updateGrid);
-    };
-    
-    const originalCloseHandler = () => {
-        cleanup();
-        if (modal.parentNode) {
-            document.body.removeChild(modal);
-        }
-        document.body.style.overflow = '';
-    };
-    
-    closeBtn.addEventListener('click', originalCloseHandler);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            cleanup();
-            modal.style.opacity = '0';
-            setTimeout(() => {
-                if (modal.parentNode) {
-                    document.body.removeChild(modal);
-                }
-                document.body.style.overflow = '';
-            }, 300);
-        }
+  modalContent.querySelectorAll('.cat-item-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const modeId = btn.getAttribute('data-mode');
+      close();
+      showCanvasView();
+      engine.switchMode(modeId);
     });
-    
-    modes.forEach(({ mode, name }) => {
-        const modeBtn = document.createElement('button');
-        modeBtn.className = 'category-modal-button w-full text-left py-2 px-3 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] text-sm cursor-pointer hover:bg-[var(--color-hover)]';
-        modeBtn.textContent = name;
+  });
 
-        modeBtn.addEventListener('click', () => {
-            cleanup();
-            if (window.setMode) {
-                window.setMode(mode, null, null);
-            }
-            showCanvasView();
-            modal.style.opacity = '0';
-            setTimeout(() => {
-                if (modal.parentNode) {
-                    document.body.removeChild(modal);
-                }
-                document.body.style.overflow = '';
-            }, 300);
-        });
-        modesGrid.appendChild(modeBtn);
-    });
-    
-    modalContent.appendChild(modesGrid);
-    modal.appendChild(modalContent);
-    
-    document.body.appendChild(modal);
-    
-    // Prevent body scroll when modal is open
-    document.body.style.overflow = 'hidden';
-    
-    // Trigger animation
-    requestAnimationFrame(() => {
-        modal.style.opacity = '1';
-    });
+  requestAnimationFrame(() => {
+    modal.style.opacity = '1';
+  });
 }
 
 export function initHomeOverlay() {
-    // Initialize home page state on load
-    // Show home page by default unless URL has a mode parameter
-    try {
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('mode')) {
-            // If mode is specified in URL, show canvas view
-            showCanvasView();
-        } else {
-            // Otherwise show home page
-            showHomePage();
-        }
-    } catch (e) {
-        console.warn('Failed to initialize home state:', e);
-        showHomePage();
+  // Check URL parameters for direct mode launch (e.g. ?mode=win_10_bsod_enhanced)
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const modeParam = params.get('mode');
+    if (modeParam && modeRegistry.getMode(modeParam)) {
+      showCanvasView();
+      engine.switchMode(modeParam);
+    } else {
+      showHomePage();
     }
-    
-    // Set up category card click handlers
-    const categoryCards = document.querySelectorAll('.category-card');
-    categoryCards.forEach(card => {
-        card.addEventListener('click', () => {
-            const category = card.getAttribute('data-category');
-            if (category) {
-                showCategoryModes(category);
-            }
-        });
+  } catch (e) {
+    showHomePage();
+  }
+
+  // Category card click listeners
+  const categoryCards = document.querySelectorAll('.category-card');
+  categoryCards.forEach(card => {
+    card.addEventListener('click', () => {
+      const catId = card.getAttribute('data-category');
+      if (catId) showCategoryModes(catId);
     });
-    
-    // Update Home button to show home page
-    const homeBtn = document.getElementById('homeBtn');
-    if (homeBtn) {
-        homeBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            showHomePage();
-        });
-        // Override onclick
-        homeBtn.setAttribute('onclick', 'showHomePage()');
-    }
+  });
 
-    // Random screensaver: Start button on home page
-    const randomScreensaverStart = document.getElementById('random-screensaver-start');
-    const randomScreensaverInterval = document.getElementById('random-screensaver-interval');
-    if (randomScreensaverStart && randomScreensaverInterval) {
-        randomScreensaverStart.addEventListener('click', () => {
-            const raw = randomScreensaverInterval.value.trim();
-            const seconds = parseInt(raw, 10);
-            if (isNaN(seconds) || seconds < 1) {
-                randomScreensaverInterval.focus();
-                randomScreensaverInterval.reportValidity?.();
-                return;
-            }
-            startRandomScreensaver(seconds);
-            showCanvasView();
-        });
-    }
+  // Random screensaver start button on Home page
+  const startBtn = document.getElementById('random-screensaver-start');
+  const intervalInput = document.getElementById('random-screensaver-interval');
+  if (startBtn && intervalInput) {
+    startBtn.addEventListener('click', () => {
+      const val = parseInt(intervalInput.value.trim(), 10);
+      const interval = isNaN(val) || val < 1 ? 15 : val;
+      screensaverController.start(interval);
+    });
+  }
 }
-

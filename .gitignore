@@ -1,5 +1,6 @@
 # Dependencies
 *node_modules*
+dist/
 
 # Generated CSS (built from src/css/input.css)
 styles.css

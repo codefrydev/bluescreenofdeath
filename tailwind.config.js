@@ -1,8 +1,9 @@
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   content: [
     "./index.html",
-    "./src/**/*.js"
+    "./src/**/*.{js,html}",
+    "./src/templates/**/*.html"
   ],
   safelist: [
     'active',
@@ -24,8 +25,13 @@ module.exports = {
         'md': '769px',
         'lg': '1200px',
       },
+      backdropBlur: {
+        'xs': '2px',
+        'md': '12px',
+        'lg': '16px',
+        'xl': '24px',
+      }
     },
   },
   plugins: [],
-}
-
+};
