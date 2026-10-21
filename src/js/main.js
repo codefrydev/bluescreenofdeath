@@ -27,6 +27,9 @@ window.closeMobileMenu = () => mobileDrawer.close();
 window.toggleGameScreensaver = () => screensaverController.openModal();
 window.stopRandomScreensaver = () => screensaverController.stop();
 window.isRandomScreensaverRunning = () => screensaverController.isRunning();
+window.searchPalette = searchPalette;
+window.modeCustomizer = modeCustomizer;
+window.screensaverController = screensaverController;
 
 // Initialize Core Engine
 engine.init();

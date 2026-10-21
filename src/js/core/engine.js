@@ -21,7 +21,6 @@ export class Engine {
     this.dpr = window.devicePixelRatio || 1;
 
     this.loop = this.loop.bind(this);
-    this.onResize = this.onResize.bind(this);
   }
 
   init() {
